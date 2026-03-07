@@ -13,7 +13,7 @@ The **Order Service** is the central orchestrator for the core business transact
 ## 3. Architecture & Order State Machine
 
 ### Order State Machine
-The core domain logic is governed by a strict state machine. Valid state transitions are tightly controlled to prevent illegal operations (e.g., attempting to refund an un-paid order).
+The core domain logic is governed by a strict state machine implemented using the **Saga Pattern** to coordinate distributed transactions across the Payment and Warehouse/Logistics domains. Valid state transitions are tightly controlled to prevent illegal operations (e.g., attempting to refund an un-paid order).
 
 ```mermaid
 stateDiagram-v2
@@ -140,7 +140,7 @@ To serve the high volume of "Where is my order?" requests, the service utilizes 
 
 - **Key**: `order:detail:{order_id}`
 - **TTL**: 10 minutes.
-- **Write-Around/Invalidation**: When the state machine transitions (e.g., from `PENDING` to `PAYMENT_COMPLETED`), the service updates PostgreSQL and explicitly calls `DEL order:detail:{order_id}`.
+- **Asynchronous Cache Invalidation (CDC)**: Instead of a synchronous `DEL` command that can lead to data races between parallel requests, the service employs **Change Data Capture (Debezium)** to listen to PostgreSQL WAL changes and automatically invalidate/update Redis. This ensures the cache perfectly mirrors the database state.
 - **Read-Through**: Upon `GET /v1/orders/{id}`, check Redis. On miss, read from Postgres, serialize to JSON, write to Redis, and return.
 
 ## 8. Failure Handling & Retry Mechanisms
@@ -157,7 +157,7 @@ To serve the high volume of "Where is my order?" requests, the service utilizes 
   2. `INSERT INTO orders ...`
   3. `INSERT INTO outbox_events ...`
   4. Commit Transaction.
-  5. A continuous background poller (or Debezium Kafka Connect) reads the `outbox_events` table and pushes them to Kafka with `acks=all`.
+  5. A **Debezium Kafka Connect Source Connector** tails the PostgreSQL WAL (Write-Ahead Log) natively, captures inserts to the `outbox_events` table, and publishes them to Kafka with `acks=all`. This avoids polling overhead on the database.
 
 ### 3. Idempotent Retry Handling (Upstream Retry)
 - If a client network times out while creating an order, they will logically resend the `POST /v1/orders` request with the *same* `Idempotency-Key`.

@@ -53,9 +53,9 @@ flowchart TD
 1. **Poll**: The consumer reads a batch of messages from `orders_topic` (e.g., `batch.size=100`).
 2. **Idempotency Check**: For each message, extract the `eventId`. Attempt a Redis `SETNX handled:{eventId} true EX 86400` (24hr TTL).
    - If false (already exists), explicitly acknowledge the offset to Kafka and skip processing.
-3. **Route**: Inspect `eventType` (e.g., `OrderCreated`). Look up user preferences (via an internal gRPC call to `User Service` or a local read-replica cache) to determine channels (Email only vs Email+Push).
+3. **Route**: Inspect `eventType` (e.g., `OrderCreated`). Look up user preferences from a local High-Speed Cache materialized from a Kafka compacted topic (e.g., `users_preferences_compacted`). This eliminates synchronous gRPC network hops to the User Service.
 4. **Render**: Fetch the template `order_created_email_en.html` and inject the `data.totalAmountCents` payload.
-5. **Dispatch**: Send HTTP request to SendGrid.
+5. **Dispatch**: Aggregate notifications and send batch HTTP requests to third-party providers (e.g., SendGrid, FCM) that support bulk dispatching. This reduces outbound connection overhead and helps avoid strict rate limits.
 6. **Commit**: Strictly commit the Kafka offset *only* after a successful 2xx response from the provider or routing to the DLQ.
 
 ## 5. Data Models & Templates
@@ -76,6 +76,7 @@ The service expects strict CloudEvents schema compliance.
 
 ### Notification Templates
 Templates use a templating engine (e.g., Go `text/template`, Handlebars, or Jinja2).
+- **Template Management**: Templates are stored centrally in an S3 Bucket and cached in-memory by the Notification Service. The service exposes an admin endpoint to flush the cache or polls S3 periodically.
 
 **`order_created_email_en.html`**
 ```html

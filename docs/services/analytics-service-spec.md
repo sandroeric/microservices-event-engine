@@ -1,7 +1,7 @@
 # Analytics Service Engineering Specification
 
 ## 1. Overview
-The **Analytics Service** is a high-throughput, data-intensive microservice responsible for consuming massive volumes of business events across the platform and structuring them for real-time and historical analysis. It processes streams of semi-structured JSON from Kafka and incrementally aggregates them into structured, queryable metrics within an OLAP-optimized storage layer.
+The **Analytics Service** is a high-throughput, data-intensive microservice responsible for consuming massive volumes of business events across the platform and structuring them for real-time and historical analysis. It processes streams of strongly-typed binary events (e.g., Avro or Protobuf via Confluent Schema Registry) from Kafka, ensuring strict schema compatibility, and incrementally aggregates them into structured, queryable metrics within an OLAP-optimized storage layer.
 
 ## 2. Responsibilities
 - **High-Volume Event Ingestion**: Consume domain events (`UserCreated`, `OrderCreated`, `PaymentFailed`) from multiple Kafka topics continuously.
@@ -107,4 +107,5 @@ Instead of computing aggregations on-the-fly when a dashboard loads (which is sl
 
 ## 7. Failure Handling & Consistency
 - **Out of Order / Late Events**: Because aggregations (`daily_sales_metrics`) use UPSERT (`ON CONFLICT DO UPDATE`), if an `OrderCreated` event arrives 3 days late due to Kafka replication lag, the aggregation job for that specific past chronological date simply recalculates and corrects the past metric transparently.
-- **Idempotency (Exactly-Once Semantics)**: High-performance databases drop `UNIQUE` constraints to speed up writes. Therefore, the Analytics Service uses Kafka Streams or ksqlDB upstream if strict Exactly-Once streaming is required. Otherwise, minor duplicate event anomalies (< 0.01%) are often accepted in statistical analytics platforms in favor of writing 50,000 rows per second.
+- **Idempotency (Exactly-Once Semantics)**: High-performance databases drop `UNIQUE` constraints to speed up writes. The Analytics Service employs a Redis-based deduplication window (e.g., 24-hour TTL on `eventId`) paired with Kafka Streams / ksqlDB upstream for strict Exactly-Once streaming. This guarantees complete accuracy for critical metrics without sacrificing insert throughput.
+- **Dead Letter Queue (DLQ)**: Events that fail schema validation (e.g., missing required fields) or routing logic are automatically forwarded to an `analytics_dlq` Kafka topic. This prevents poison pills from blocking the consumer group.

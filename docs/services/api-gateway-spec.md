@@ -23,10 +23,10 @@ Requests traverse a configured middleware chain before being proxied downstream:
 2. **Observability Middleware**: Initializes tracing (OpenTelemetry) and logs the incoming request.
 3. **CORS Middleware**: Handles preflight requests.
 4. **Rate Limiter Middleware**: Checks Redis counter for the client IP / API Key.
-5. **Auth Middleware**: Validates JWT signature and expiry.
+5. **Auth Middleware**: Validates JWT signature/expiry locally, and checks the Redis Revoked Token Cache to ensure the token hasn't been blacklisted.
 6. **Validation Middleware**: Checks for required headers (`X-Request-ID`, `Idempotency-Key`).
 7. **Cache Middleware**: Returns cached response for GET routes if available.
-8. **Reverse Proxy (Director)**: Routes the request to K8s internal service DNS, wrapped in a Circuit Breaker.
+8. **Reverse Proxy (Director)**: Routes the request via a Service Mesh (e.g., Istio or Linkerd) or client-side load balancer, providing intelligent retry policies and wrapping requests in a Circuit Breaker.
 
 ## 4. Workflows
 
@@ -79,7 +79,7 @@ sequenceDiagram
 - **Keep-Alive**: Configured to reuse TCP connections to upstream clients and internal microservices.
 
 ### Redis Rate Limiting Strategy
-- **Algorithm**: *Sliding Window Log* or *Token Bucket* implemented via Redis Lua Scripts to guarantee atomicity.
+- **Algorithm**: *Token Bucket* implemented via Atomic Redis Lua Scripts. This executes the read/check/decrement as a single atomic operation to eliminate race conditions when multiple API Gateway replicas process concurrent requests for the same IP.
 - **Limits**: Configured at multiple tiers (e.g., 100 req/sec per IP, 1000 req/min per User).
 - **Headers**: Returns `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` to the client.
 

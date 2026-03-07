@@ -45,6 +45,18 @@ The primary table storing core identity and profile data.
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Record creation timestamp. |
 | `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | Record modification timestamp. |
 
+**Table: `audit_logs`**
+Tracks security-critical actions (login attempts, password resets) to detect brute-forcing and credential stuffing.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY | Unique log identifier. |
+| `user_id` | UUID | INDEX | (Optional) if associated with a user. |
+| `action` | VARCHAR(100) | NOT NULL | e.g., `LOGIN_SUCCESS`, `LOGIN_FAILED`. |
+| `ip_address` | INET | | Client IP address. |
+| `user_agent` | TEXT | | Client User-Agent hash. |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Event timestamp. |
+
 **Table: `refresh_tokens`**
 Tracks long-lived sessions to allow rotation and revocation.
 
@@ -72,8 +84,7 @@ Used for the Transactional Outbox pattern to guarantee event publishing.
 - **Keys**: `user:profile:{user_id}`
 - **TTL**: 1 hour.
 - **Invalidation**: 
-  - On `PUT /v1/users/me`, the service updates PostgreSQL and immediately deletes the Redis key (`DEL user:profile:{user_id}`).
-  - Subsequent GET requests will experience a cache miss, re-fetch from PostgreSQL, and populate Redis.
+  - To prevent read-write data races upon rapid subsequent edits, the service utilizes **Change Data Capture (Debezium)**. Upon updating the PostgreSQL row, Debezium streams the WAL changes and asynchronously updates or invalidates the Redis key (`user:profile:{user_id}`).
 - **Performance consideration**: Profiles are heavily read by internal systems (if not passed via headers), making this cache critical for latency.
 
 ## 6. APIs and Interfaces
@@ -145,7 +156,7 @@ To ensure the `UserCreated` event is published to Kafka *if and only if* the Pos
 
 ## 8. Security Considerations
 
-- **Password Hashing**: Use **Bcrypt** with a work factor of at least 12. Alternatively, Argon2id. Never log passwords in plain text.
+- **Password Hashing**: Use **Argon2id** (the memory-hard winner of the Password Hashing Competition) to mitigate GPU-based cracking attacks. Never log passwords in plain text.
 - **JWT Generation**: Access tokens are signed using `RS256` (Asymmetric). The private key is securely stored in a Secret Manager (e.g., AWS Secrets Manager, HashiCorp Vault) and loaded into memory on service startup. Only the public key is exposed (via a JWKS endpoint) for the API Gateway to verify signatures.
 - **Token Blacklisting (Revocation)**: When a user logs out, the refresh token is marked `is_revoked = true` in Postgres. To immediately invalidate the short-lived access token, its `jti` (JWT ID) is placed in a Redis blacklist (`blacklist:{jti}`) with a TTL equal to the token's remaining lifespan. The API Gateway checks this blacklist during auth.
 - **PII Protection**: Fields like `email`, `first_name`, and `last_name` should be encrypted at rest within the PostgreSQL database using Transparent Data Encryption (TDE) or application-level encryption for high-compliance environments.
