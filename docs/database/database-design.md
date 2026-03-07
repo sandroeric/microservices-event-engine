@@ -24,6 +24,7 @@ erDiagram
         varchar first_name
         varchar last_name
         timestamp created_at
+        timestamp updated_at
     }
     REFRESH_TOKENS {
         uuid token_id PK
@@ -40,7 +41,9 @@ erDiagram
         uuid user_id
         varchar status
         bigint total_amount
+        varchar currency
         timestamp created_at
+        timestamp updated_at
     }
     ORDER_ITEMS {
         uuid id PK
@@ -57,7 +60,6 @@ erDiagram
         uuid aggregate_id
         varchar event_type
         jsonb payload
-        varchar status
     }
     ORDERS ||--o{ OUTBOX_EVENTS : triggers
     USERS ||--o{ OUTBOX_EVENTS : triggers
@@ -89,19 +91,19 @@ Handles identities and credentials.
 
 ### 4.2 Order Service (`orders_db`)
 Handles the transactional financial orders.
-- **`orders`**: Core order metadata. Contains critical `idempotency_key` with a `UNIQUE INDEX` to guard against duplicate payment captures.
-- **`order_items`**: Line items constrained to `order_id` via a strict `FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT`.
+- **`orders`**: Core order metadata. Contains critical `idempotency_key` with a `UNIQUE INDEX` to guard against duplicate payment captures. `total_amount` is stored in minor units (e.g., cents) as a `bigint` to avoid floating-point errors, alongside a `currency` code.
+- **`order_items`**: Line items constrained to `order_id` via a strict `FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT`. `unit_price` also uses minor units.
 - **`outbox_events`**: Standard Outbox table.
 
 ### 4.3 Analytics Service (`analytics_db`)
 Handles massive ingestion volumes.
-- **`raw_events`**: Append-only log. Heavily partitioned by `DATE(created_at)`. No `UNIQUE` constraints to maintain write throughput.
+- **`raw_events`**: Append-only log. Uses **PostgreSQL Declarative Partitioning** (`PARTITION BY RANGE (created_at)`). No `UNIQUE` constraints to maintain write throughput. Note that the partition key (`created_at`) must be included in the Primary Key or Unique constraints if you choose to add them later.
 - **`daily_sales_metrics`**: Rollup tables updated via UPSERT (`INSERT ... ON CONFLICT (metric_date) DO UPDATE`).
 
 ## 5. Indexing Strategies & Query Optimization
 
 ### 1. Primary and Foreign Keys
-- All PKs use `UUIDv4` or `UUIDv7` to allow client-side ID generation and mitigate distributed sequence contention.
+- All PKs MUST use **UUIDv7**. `UUIDv7` embeds a timestamp, making it sequentially sortable while remaining decentralized and globally unique, drastically improving database page caching and insert speed compared to completely random `UUIDv4` which leads to index fragmentation.
 - All local Foreign Keys (e.g., `order_items.order_id`) MUST have B-Tree indexes to optimize `JOIN` operations and prevent full table scans during `ON DELETE` cascade checks.
 
 ### 2. Time-Series Optimization (BRIN)
@@ -113,10 +115,23 @@ Handles massive ingestion volumes.
 
 ### 4. Partial Indexes
 - For tables spanning active and historical data, use partial indexes to save RAM.
-- Example: The Kafka Outbox publisher only searches for PENDING events.
-  `CREATE INDEX idx_outbox_pending ON outbox_events(created_at) WHERE status = 'PENDING';`
+- Example: If an application needs to query only active users:
+  `CREATE INDEX idx_active_users ON users(email) WHERE is_active = true;`
 
-## 6. Migration Strategy
+## 6. Connection Pooling
+
+In a horizontally scaled microservices architecture, database connections can easily become exhausted.
+- **Infrastructure-level Pooler**: Use a pooler like **PgBouncer** or **Pgpool-II** configured in `transaction` mode to multiplex thousands of client connections onto a small number of actual PostgreSQL connections.
+- **Application-level Pooler**: Maintain a small, healthy pool within the application (e.g., `pgxpool` in Go or `HikariCP` in Java) to minimize connection overhead.
+
+## 7. Security & PII Compliance (GDPR/CCPA)
+
+Handling sensitive user data requires strict compliance measures:
+- **Data at Rest Encryption**: Rely on transparent disk encryption (e.g., AWS EBS encryption) for the database volumes.
+- **Column-level Encryption**: For highly sensitive PII in the `users_db` (e.g., SSN, financial/health data), use application-level encryption before storing the data. Standard PII like `first_name` and `last_name` should be protected by strict RBAC and network isolation.
+- **Auditing**: Use `updated_at` timestamps on mutable tables (`USERS`, `ORDERS`), ideally enforced by a PostgreSQL trigger to prevent application-level bugs.
+
+## 8. Migration Strategy
 
 Schema migrations must be strictly forward-compatible to enable zero-downtime deployments.
 
@@ -129,7 +144,7 @@ Schema migrations must be strictly forward-compatible to enable zero-downtime de
    - **Phase 3 (Cutover)**: Deploy code that reads and writes *only* to the new column.
    - **Phase 4 (Contract)**: Drop the old column in a subsequent release.
 
-## 7. Data Consistency Model
+## 9. Data Consistency Model
 
 ### Transactional Consistency (Local)
 Within the boundaries of a single microservice, we rely on PostgreSQL's strict ACID properties at the `READ COMMITTED` isolation level.
@@ -138,5 +153,6 @@ Within the boundaries of a single microservice, we rely on PostgreSQL's strict A
 ### Eventual Consistency (Distributed)
 Across the platform, we embrace **Eventual Consistency** utilizing the Saga and Outbox patterns.
 - **The Dual-Write Problem**: A service must never write to PostgreSQL and call a Kafka Producer sequentially within API logic, as one could fail while the other succeeds.
-- **Transactional Outbox**: By writing the domain state (`orders`) and the event payload (`outbox_events`) in the *same* local Postgres transaction, we guarantee the event is persisted. A background worker (Debezium) reading the WAL (Write-Ahead Log) ensures the event eventually reaches Kafka, keeping the rest of the system (Analytics, Notifications) consistently updated.
+- **Transactional Outbox**: By writing the domain state (`orders`) and the event payload (`outbox_events`) in the *same* local Postgres transaction, we guarantee the event is persisted. A background worker (Debezium) reading the WAL (Write-Ahead Log) ensures the event eventually reaches Kafka via Change Data Capture (CDC), completely avoiding polling overhead.
+- **Saga Compensations**: Since distributed transactions cannot simply "rollback," failures (e.g., payment declined) require compensating transactions. For example, if the Order Service emits `OrderCreated`, and the Payment Service fails to process it, it emits `PaymentFailed`. The Order Service consumes this to asynchronously update the `orders` table `status` to `CANCELLED`. Correlation IDs in the event payloads tie these spanning operations together.
 - **Idempotency checks**: Because eventually consistent networks can retry deliveries, `UNIQUE INDEX` constraints inside PostgreSQL (e.g., `orders.idempotency_key`) act as the absolute final defense against duplicate operations.
