@@ -65,7 +65,7 @@ When using Avro with Schema Registry, all schemas must be registered under **`BA
 ### Topic Creation Policy
 Topics must **not** be created ad-hoc in production. All topic definitions are source-controlled via Terraform (or Confluent's `kafka-topics` operator for K8s). A CI schema check must pass before topic creation is merged.
 
-**Naming convention**: `{domain}.{aggregate}.{purpose}` (e.g., `domain.orders.events`, `sys.notifications.dlq`).
+**Naming convention**: `{domain}.{aggregate}.{purpose}` (e.g., `domain.orders.events`, `domain.notifications.dlq`).
 
 ### Retention Policy
 | Topic Type | Retention | Rationale |

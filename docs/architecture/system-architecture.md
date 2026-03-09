@@ -98,6 +98,17 @@ sequenceDiagram
 | `user_id` | UUID | NOT NULL, FK → `users.id` ON DELETE CASCADE | Owning user |
 | `expires_at` | TIMESTAMPTZ | NOT NULL | Absolute expiration time |
 | `is_revoked` | BOOLEAN | NOT NULL, DEFAULT FALSE | Manual invalidation flag |
+| `device_info` | VARCHAR(255) | NULLABLE | Optional metadata (e.g., User-Agent hash) |
+
+**`audit_logs` table**
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY | Unique log identifier |
+| `user_id` | UUID | NULLABLE, indexed | Associated user (if known) |
+| `action` | VARCHAR(100) | NOT NULL | e.g., `LOGIN_SUCCESS`, `LOGIN_FAILED` |
+| `ip_address` | INET | NULLABLE | Client IP address |
+| `user_agent` | TEXT | NULLABLE | Client User-Agent hash |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Event timestamp |
 
 ### Order Service (PostgreSQL)
 **`orders` table**
@@ -106,7 +117,7 @@ sequenceDiagram
 | `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v7() | Surrogate key |
 | `user_id` | UUID | NOT NULL, indexed | Logical FK to `users.id` (no physical FK across services) |
 | `idempotency_key` | VARCHAR(255) | UNIQUE, NOT NULL | Prevents duplicate order creation |
-| `total_amount` | BIGINT | NOT NULL | Amount in smallest currency unit (e.g., cents) |
+| `total_amount_cents` | BIGINT | NOT NULL | Amount in smallest currency unit (e.g., cents) |
 | `currency` | VARCHAR(3) | NOT NULL, DEFAULT 'USD' | ISO 4217 currency code |
 | `status` | VARCHAR(50) | NOT NULL, DEFAULT 'PENDING' | `PENDING`, `PAYMENT_PROCESSING`, `PAYMENT_COMPLETED`, `PAYMENT_FAILED`, `FULFILLMENT_IN_PROGRESS`, `SHIPPED`, `DELIVERED`, `CANCELLED` |
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Creation timestamp |

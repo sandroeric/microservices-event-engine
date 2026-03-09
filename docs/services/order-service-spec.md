@@ -45,7 +45,7 @@ The transactional data store ensuring ACID properties for all financial records.
 | `idempotency_key`| VARCHAR(255) | UNIQUE, NOT NULL | Prevents duplicate charges. |
 | `user_id`| UUID | NOT NULL | Customer identifier. |
 | `status` | VARCHAR(50) | NOT NULL | e.g., `PENDING`. |
-| `total_amount` | BIGINT | NOT NULL | Total amount in cents. |
+| `total_amount_cents` | BIGINT | NOT NULL | Total amount in cents. |
 | `currency` | VARCHAR(3) | DEFAULT 'USD' | ISO 4217 Currency Code. |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Timestamp. |
 | `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | Timestamp. |
@@ -65,7 +65,7 @@ The transactional data store ensuring ACID properties for all financial records.
 | `id` | UUID | PRIMARY KEY | Event ID. |
 | `aggregate_type` | VARCHAR(100) | NOT NULL | e.g., `order`. |
 | `aggregate_id` | UUID | NOT NULL | The order aggregate ID. |
-| `event_type` | VARCHAR(100) | NOT NULL | e.g., `domain.orders.OrderCreated`. |
+| `event_type` | VARCHAR(200) | NOT NULL | e.g., `domain.orders.OrderCreated`. |
 | `payload` | JSONB | NOT NULL | Full event structure. |
 | `status` | VARCHAR(20) | DEFAULT 'PENDING' | `PENDING`, `PUBLISHED`. |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Timestamp. |
@@ -120,9 +120,9 @@ All events published to the `domain.orders.events` topic must conform to the fol
 - **Response (201 Created):**
 ```json
 {
-  "id": "ord_987654",
+  "order_id": "ord_987654",
   "status": "PENDING",
-  "total_amount": 5000
+  "total_amount_cents": 5000
 }
 ```
 

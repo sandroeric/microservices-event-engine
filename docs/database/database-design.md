@@ -33,6 +33,7 @@ erDiagram
         uuid user_id FK
         timestamp expires_at
         boolean is_revoked
+        varchar device_info
     }
     USERS ||--o{ REFRESH_TOKENS : has
     AUDIT_LOGS {
@@ -51,7 +52,7 @@ erDiagram
         varchar idempotency_key UK
         uuid user_id
         varchar status
-        bigint total_amount
+        bigint total_amount_cents
         varchar currency
         timestamp created_at
         timestamp updated_at
@@ -90,7 +91,7 @@ erDiagram
     DAILY_SALES_METRICS {
         date date PK
         bigint total_orders
-        bigint gross_revenue
+        bigint gross_revenue_cents
         bigint unique_users
     }
 ```
@@ -106,14 +107,14 @@ Handles identities and credentials.
 
 ### 4.2 Order Service (`orders_db`)
 Handles the transactional financial orders.
-- **`orders`**: Core order metadata. Contains critical `idempotency_key` with a `UNIQUE INDEX` to guard against duplicate payment captures. `total_amount` is stored in minor units (e.g., cents) as a `bigint` to avoid floating-point errors, alongside a `currency` code.
-- **`order_items`**: Line items constrained to `order_id` via a strict `FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT`. `unit_price` also uses minor units.
+- **`orders`**: Core order metadata. Contains critical `idempotency_key` with a `UNIQUE INDEX` to guard against duplicate payment captures. `total_amount_cents` is stored in minor units (e.g., cents) as a `bigint` to avoid floating-point errors, alongside a `currency` code.
+- **`order_items`**: Line items constrained to `order_id` via a strict `FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT`. `unit_price_cents` also uses minor units.
 - **`outbox_events`**: Standard Outbox table.
 
 ### 4.3 Analytics Service (`analytics_db`)
 Handles massive ingestion volumes.
 - **`raw_events`**: Append-only log. Uses **PostgreSQL Declarative Partitioning** (`PARTITION BY RANGE (created_at)`). No `UNIQUE` constraints to maintain write throughput. Note that the partition key (`created_at`) must be included in the Primary Key or Unique constraints if you choose to add them later.
-- **`daily_sales_metrics`**: Rollup tables updated via UPSERT (`INSERT ... ON CONFLICT (metric_date) DO UPDATE`).
+- **`daily_sales_metrics`**: Rollup tables updated via UPSERT (`INSERT ... ON CONFLICT (date) DO UPDATE`).
 
 ## 5. Indexing Strategies & Query Optimization
 

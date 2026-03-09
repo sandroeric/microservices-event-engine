@@ -77,7 +77,7 @@ Used for the Transactional Outbox pattern to guarantee event publishing.
 | `id` | UUID | PRIMARY KEY | Event ID. |
 | `aggregate_type` | VARCHAR(100) | NOT NULL | e.g., `user`. |
 | `aggregate_id` | UUID | NOT NULL | The `user_id` mutated. |
-| `event_type` | VARCHAR(100) | NOT NULL | e.g., `domain.users.UserCreated`. |
+| `event_type` | VARCHAR(200) | NOT NULL | e.g., `domain.users.UserCreated`. |
 | `payload` | JSONB | NOT NULL | The event body. |
 | `status` | VARCHAR(50) | DEFAULT 'PENDING'| `PENDING` or `PUBLISHED`. |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | When the event was written. |
@@ -85,7 +85,7 @@ Used for the Transactional Outbox pattern to guarantee event publishing.
 ## 5. Caching Strategy
 - **Mechanism**: Read-through cache backed by Redis.
 - **Keys**: `user:profile:v1:{user_id}`
-- **TTL**: 1 hour.
+- **TTL**: 1 hour + random jitter (to prevent cache avalanche on simultaneous expirations).
 - **Invalidation**: 
   - To prevent read-write data races upon rapid subsequent edits, the service utilizes **Change Data Capture (Debezium)**. Upon updating the PostgreSQL row, Debezium streams the WAL changes and asynchronously updates or invalidates the Redis key (`user:profile:v1:{user_id}`).
 - **Performance consideration**: Profiles are heavily read by internal systems (if not passed via headers), making this cache critical for latency.

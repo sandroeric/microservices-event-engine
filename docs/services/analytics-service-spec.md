@@ -69,7 +69,7 @@ Append-only log of all flattened events. Highly partitioned.
 |--------|------|-------------|-------------|
 | `date` | DATE | PRIMARY KEY | Truncated `created_at`. |
 | `total_orders` | BIGINT | | Count of `OrderCreated` events. |
-| `gross_revenue`| BIGINT | | Sum of `total_amount_cents`. |
+| `gross_revenue_cents`| BIGINT | | Sum of `total_amount_cents`. |
 | `unique_users` | BIGINT | | Count distinct `user_id`. |
 
 ## 5. Workflows
@@ -85,17 +85,19 @@ Append-only log of all flattened events. Highly partitioned.
 Instead of computing aggregations on-the-fly when a dashboard loads (which is slow for millions of rows), background jobs continuously pre-calculate metrics.
 - **Hourly Cron Job**: Runs at minute 15 of every hour.
   ```sql
-  INSERT INTO daily_sales_metrics (date, total_orders, gross_revenue)
+  INSERT INTO daily_sales_metrics (date, total_orders, gross_revenue_cents, unique_users)
   SELECT 
     DATE_TRUNC('day', created_at),
     COUNT(*),
-    SUM(metric_value)
+    SUM(metric_value),
+    COUNT(DISTINCT user_id)
   FROM raw_events 
   WHERE event_type = 'OrderCreated' 
     AND created_at >= '2026-03-06'
   ON CONFLICT (date) DO UPDATE SET 
     total_orders = EXCLUDED.total_orders,
-    gross_revenue = EXCLUDED.gross_revenue;
+    gross_revenue_cents = EXCLUDED.gross_revenue_cents,
+    unique_users = EXCLUDED.unique_users;
   ```
 
 ## 6. Optimization Strategies
