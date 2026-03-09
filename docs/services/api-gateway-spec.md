@@ -122,7 +122,7 @@ All Gateway exceptions return a standardized JSON problem payload:
   - `POST /api/v1/orders`
   - Headers: `Authorization: Bearer <token>`, `Idempotency-Key: <uuid>`
 - **Internal Proxied View (to Order Service)**:
-  - `POST http://order-service:8080/v1/orders`
+  - `gRPC OrderService/CreateOrder`
   - Appended Headers: `X-User-Id: <uuid from token>`, `X-Trace-Id: <trace-id>`
 
 ### **Route: Get User Profile**
@@ -130,5 +130,5 @@ All Gateway exceptions return a standardized JSON problem payload:
   - `GET /api/v1/users/me`
   - Headers: `Authorization: Bearer <token>`
 - **Internal Proxied View (to User Service)**:
-  - `GET http://user-service:8080/v1/users/<extracted-user-id>`
+  - `gRPC UserService/GetUser`
   - Appended Headers: `X-User-Id: <uuid>`, `X-Trace-Id: <trace-id>`

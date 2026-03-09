@@ -23,8 +23,10 @@ erDiagram
         varchar password_hash
         varchar first_name
         varchar last_name
+        varchar status
         timestamp created_at
         timestamp updated_at
+        timestamp deleted_at
     }
     REFRESH_TOKENS {
         uuid token_id PK
@@ -56,10 +58,13 @@ erDiagram
 
     %% Standard Outbox Table (Per Service)
     OUTBOX_EVENTS {
-        uuid event_id PK
+        uuid id PK
+        varchar aggregate_type
         uuid aggregate_id
         varchar event_type
         jsonb payload
+        varchar status
+        timestamp created_at
     }
     ORDERS ||--o{ OUTBOX_EVENTS : triggers
     USERS ||--o{ OUTBOX_EVENTS : triggers

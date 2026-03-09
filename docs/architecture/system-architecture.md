@@ -83,8 +83,10 @@ sequenceDiagram
 |--------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Surrogate key |
 | `email` | VARCHAR(255) | UNIQUE, NOT NULL, indexed | Login identifier |
-| `password_hash` | VARCHAR(255) | NOT NULL | Bcrypt hash, cost factor 12 |
-| `is_active` | BOOLEAN | NOT NULL, DEFAULT TRUE | Soft active flag |
+| `password_hash` | VARCHAR(255) | NOT NULL | Argon2id hash |
+| `first_name` | VARCHAR(100) | NOT NULL | User's given name |
+| `last_name` | VARCHAR(100) | NOT NULL | User's family name |
+| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `SUSPENDED`, `DELETED` |
 | `deleted_at` | TIMESTAMPTZ | NULLABLE | Soft delete timestamp; NULL = active |
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Last mutation (trigger-maintained) |
@@ -118,8 +120,8 @@ sequenceDiagram
 | `aggregate_id` | UUID | NOT NULL, indexed | The ID of the entity that changed |
 | `event_type` | VARCHAR(200) | NOT NULL | e.g., `domain.orders.OrderCreated` |
 | `payload` | JSONB | NOT NULL | Full CloudEvents-compliant JSON body |
+| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'PENDING' | `PENDING`, `PUBLISHED` |
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | When the event was written |
-| `published_at` | TIMESTAMPTZ | NULLABLE | Set by relay when Kafka ACK received; NULL = pending |
 
 ### Analytics Service (PostgreSQL)
 **`daily_sales_metrics` table**
@@ -213,8 +215,7 @@ sequenceDiagram
 ## 9. Security Considerations
 - **Authentication**: Stateless JWT validation at the API Gateway using locally cached public keys (no round-trip to User Service per request).
 - **Network Segmentation**: Internal microservices (Order, User, Notification) are not exposed to the public internet; all external ingress flows through the Ingress Controller → API Gateway chain.
-- **Secret Management**: All credentials (DB passwords, API keys, JWT signing keys) are stored in **HashiCorp Vault** and injected into pods via the Vault Agent Sidecar or the Vault Secrets Operator for Kubernetes. Kubernetes native Secrets are not used for sensitive values, as they are only base64-encoded and not encrypted at rest by default.
-  - *If Vault is not available during initial setup*: Enable [Kubernetes Secrets encryption at rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) as a minimum requirement before handling production data.
+- **Secret Management**: All credentials (DB passwords, API keys, JWT signing keys) are stored in an external vault (e.g., HashiCorp Vault, AWS Secrets Manager). We utilize the **External Secrets Operator (ESO)** to authenticate with the vault and seamlessly sync those credentials into native Kubernetes `Secret` objects. This allows standard container environment variable injection while preventing secrets from ever being committed to Git or hardcoded in configurations.
 
 ## 10. Observability
 ### Observability Strategy

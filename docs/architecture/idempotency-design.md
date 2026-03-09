@@ -45,7 +45,7 @@ The platform employs a two-tiered approach to idempotency storage to balance ext
 ### Tier 1: Redis (The API Gateway / Fast Path)
 - **Role**: Blocks rapid, immediate duplicate requests (e.g., a user double-clicking a submit button).
 - **Mechanism**:
-  1. Gateway attempts to `SETNX idemp:api:{Idempotency-Key} "PROCESSING" EX 86400`.
+  1. Gateway attempts to `SETNX idemp:api:{Idempotency-Key} "PROCESSING" EX 30`.
   2. If it succeeds, the request routes to the downstream service.
   3. When the downstream service returns the response body (e.g., `{"order_id": "123"}`), the Gateway updates the Redis key with the serialized HTTP response: `SET idemp:api:{Idempotency-Key} "{...response...}"`.
   4. If a duplicate request arrives and the key equals `"PROCESSING"`, the Gateway returns `409 Conflict` (indicating a concurrent request is already handling this intent).

@@ -22,9 +22,9 @@ The service does not expose a public HTTP API for triggering notifications; it i
 ```mermaid
 flowchart TD
     subgraph Kafka Cluster
-        TopicUsers[users_topic]
-        TopicOrders[orders_topic]
-        DLQ[notifications_dlq]
+        TopicUsers[domain.users.events]
+        TopicOrders[domain.orders.events]
+        DLQ[domain.notifications.dlq]
     end
     
     subgraph Notification Service [Consumer Group: notification-service-cg]
@@ -50,8 +50,8 @@ flowchart TD
 ## 4. Workflows
 
 ### Queue Consumption Strategy
-1. **Poll**: The consumer reads a batch of messages from `orders_topic` (e.g., `batch.size=100`).
-2. **Idempotency Check**: For each message, extract the `eventId`. Attempt a Redis `SETNX handled:{eventId} true EX 86400` (24hr TTL).
+1. **Poll**: The consumer reads a batch of messages from `domain.orders.events` (e.g., `batch.size=100`).
+2. **Idempotency Check**: For each message, extract the `eventId`. Attempt a Redis `SETNX handled:{eventId} true EX 604800` (7-day TTL).
    - If false (already exists), explicitly acknowledge the offset to Kafka and skip processing.
 3. **Route**: Inspect `eventType` (e.g., `OrderCreated`). Look up user preferences from a local High-Speed Cache materialized from a Kafka compacted topic (e.g., `users_preferences_compacted`). This eliminates synchronous gRPC network hops to the User Service.
 4. **Render**: Fetch the template `order_created_email_en.html` and inject the `data.totalAmountCents` payload.
@@ -102,7 +102,7 @@ When an outbound HTTP request to a provider fails, the service inspects the HTTP
 - **Permanent Failures (400, 401, 403, 404)**: Do not retry. The payload is malformed or credentials are revoked. Route immediately to the **DLQ**.
 
 ### 3. Dead Letter Queues (DLQ)
-Messages that exhaust retries or trigger unhandled schema parsing exceptions are pushed to a dedicated Kafka topic: `notifications_dlq`.
+Messages that exhaust retries or trigger unhandled schema parsing exceptions are pushed to a dedicated Kafka topic: `domain.notifications.dlq`.
 - **Structure**: The DLQ message wraps the original payload with metadata:
 ```json
 {

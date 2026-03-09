@@ -62,24 +62,28 @@ The transactional data store ensuring ACID properties for all financial records.
 **Table: `outbox_events`**
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `event_id` | UUID | PRIMARY KEY | Unique Event ID. |
-| `order_id` | UUID | NOT NULL | The order aggregate ID. |
+| `id` | UUID | PRIMARY KEY | Event ID. |
+| `aggregate_type` | VARCHAR(100) | NOT NULL | e.g., `order`. |
+| `aggregate_id` | UUID | NOT NULL | The order aggregate ID. |
 | `event_type` | VARCHAR(100) | NOT NULL | e.g., `OrderCreated`. |
 | `payload` | JSONB | NOT NULL | Full event structure. |
 | `status` | VARCHAR(20) | DEFAULT 'PENDING' | `PENDING`, `PUBLISHED`. |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Timestamp. |
 
 ## 5. Event Schema (Kafka)
 
-All events published to the `orders_topic` must conform to the following CloudEvents-inspired JSON structure:
+All events published to the `domain.orders.events` topic must conform to the following CloudEvents-inspired JSON structure:
 
-**`OrderCreated` Event Payload:**
+**`OrderCreated` Event Payload (CloudEvents v1.0):**
 ```json
 {
-  "eventId": "evt_abc123",
-  "eventType": "OrderCreated",
-  "timestamp": "2026-03-07T12:00:00Z",
-  "aggregateId": "ord_987654",
-  "version": 1,
+  "specversion": "1.0",
+  "type": "domain.orders.OrderCreated",
+  "source": "/services/order-service",
+  "id": "evt_abc123",
+  "time": "2026-03-07T12:00:00Z",
+  "datacontenttype": "application/json",
+  "subject": "ord_987654",
   "data": {
     "userId": "usr_9cc9b6",
     "totalAmountCents": 5000,

@@ -63,7 +63,7 @@ Every microservice must expose a Prometheus HTTP endpoint (typically `/metrics` 
 ### Minimum Required Metrics (RED Method)
 1. **Rate**: 
    - HTTP: `http_requests_total{method="POST", path="/orders", status="201", service="order-service"}`
-   - Kafka: `kafka_messages_published_total{topic="orders_topic"}`
+   - Kafka: `kafka_messages_published_total{topic="domain.orders.events"}`
 2. **Errors**: 
    - HTTP: `http_requests_total{status=~"5.*"}`
 3. **Duration**: 

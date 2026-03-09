@@ -24,7 +24,7 @@ flowchart TD
     end
     
     subgraph Messaging
-        UserService -->|Publish (Outbox Relay)| Kafka[Kafka: users_topic]
+        UserService -->|Publish (Outbox Relay)| Kafka[Kafka: domain.users.events]
     end
 ```
 
@@ -38,12 +38,13 @@ The primary table storing core identity and profile data.
 |--------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY | Unique user identifier. |
 | `email` | VARCHAR(255) | UNIQUE, NOT NULL | Normalized lowercase email address. |
-| `password_hash` | VARCHAR(255)| NOT NULL | Bcrypt hashed password. |
+| `password_hash` | VARCHAR(255)| NOT NULL | Argon2id hashed password. |
 | `first_name` | VARCHAR(100) | NOT NULL | User's given name. |
 | `last_name` | VARCHAR(100) | NOT NULL | User's family name. |
 | `status` | VARCHAR(50) | DEFAULT 'ACTIVE' | `ACTIVE`, `SUSPENDED`, `DELETED`. |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Record creation timestamp. |
 | `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | Record modification timestamp. |
+| `deleted_at` | TIMESTAMPTZ | NULLABLE | Soft delete timestamp. |
 
 **Table: `audit_logs`**
 Tracks security-critical actions (login attempts, password resets) to detect brute-forcing and credential stuffing.
@@ -74,10 +75,12 @@ Used for the Transactional Outbox pattern to guarantee event publishing.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY | Event ID. |
+| `aggregate_type` | VARCHAR(100) | NOT NULL | e.g., `user`. |
 | `aggregate_id` | UUID | NOT NULL | The `user_id` mutated. |
 | `event_type` | VARCHAR(100) | NOT NULL | e.g., `UserCreated`. |
 | `payload` | JSONB | NOT NULL | The event body. |
 | `status` | VARCHAR(50) | DEFAULT 'PENDING'| `PENDING` or `PUBLISHED`. |
+| `created_at` | TIMESTAMPTZ | DEFAULT NOW() | When the event was written. |
 
 ## 5. Caching Strategy
 - **Mechanism**: Read-through cache backed by Redis.
@@ -152,7 +155,7 @@ To ensure the `UserCreated` event is published to Kafka *if and only if* the Pos
 2. Insert new user into `users` table.
 3. Insert event payload into `outbox_events` table (Status: `PENDING`).
 4. Commit Transaction.
-5. An asynchronous background process (or Debezium) sweeps `outbox_events` where `status = PENDING`, publishes them to Kafka topic `users_topic`, and updates the status to `PUBLISHED`.
+5. An asynchronous background process (or Debezium) sweeps `outbox_events` where `status = PENDING`, publishes them to Kafka topic `domain.users.events`, and updates the status to `PUBLISHED`.
 
 ## 8. Security Considerations
 
