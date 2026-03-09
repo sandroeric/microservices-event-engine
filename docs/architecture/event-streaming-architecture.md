@@ -39,7 +39,7 @@ All messages must adhere to the **CloudEvents** specification (v1.0). For Avro, 
   "time": "2026-03-07T12:00:00Z",
   "subject": "ord_987654",
   "data": {
-    "userId": "usr_9cc9b6",
+    "user_id": "usr_9cc9b6",
     "totalAmountCents": 5000,
     "items": [
       {
@@ -131,7 +131,7 @@ flowchart TD
 ### Idempotent Event Consumption
 Kafka's *At-Least-Once* delivery guarantee means consumers will occasionally receive the same event twice (e.g., during consumer rebalancing).
 - **Rule**: Every consumer MUST be idempotent.
-- **Strategy A (Strict)**: The consumer checks the event `id` against a Redis cache (`SETNX processed:{id} 1 EX 86400`). If the key exists, acknowledge the offset and skip processing.
+- **Strategy A (Strict)**: The consumer checks the event `id` against a Redis cache (`SETNX event:processed:{id} 1 EX 86400`). If the key exists, acknowledge the offset and skip processing.
 - **Strategy B (Database UPSERT)**: The Analytics Service simply uses SQL `ON CONFLICT (id) DO UPDATE`. Replaying the event yields the same final state.
 
 ### Consumer Rebalancing & Long Retries

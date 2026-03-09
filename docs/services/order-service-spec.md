@@ -85,7 +85,7 @@ All events published to the `domain.orders.events` topic must conform to the fol
   "datacontenttype": "application/json",
   "subject": "ord_987654",
   "data": {
-    "userId": "usr_9cc9b6",
+    "user_id": "usr_9cc9b6",
     "totalAmountCents": 5000,
     "currency": "USD",
     "items": [

@@ -108,7 +108,7 @@ All Gateway exceptions return a standardized JSON problem payload:
 ## 8. Observability
 
 ### Metrics and Tracing
-- **Tracing**: Injects `X-Trace-Id` generated via OpenTelemetry into the context, passing it as an HTTP header to downstream services.
+- **Tracing**: Injects `traceparent` generated via OpenTelemetry into the context, passing it as an HTTP header to downstream services.
 - **Metrics**: Exposes `/metrics` endpoint with Prometheus counters:
   - `http_requests_total{method="GET", route="/users", status="200"}`
   - `http_request_duration_seconds{route="/orders"}`
@@ -123,7 +123,7 @@ All Gateway exceptions return a standardized JSON problem payload:
   - Headers: `Authorization: Bearer <token>`, `Idempotency-Key: <uuid>`
 - **Internal Proxied View (to Order Service)**:
   - `gRPC OrderService/CreateOrder`
-  - Appended Headers: `X-User-Id: <uuid from token>`, `X-Trace-Id: <trace-id>`
+  - Appended Headers: `X-User-Id: <uuid from token>`, `traceparent: <trace-id>`
 
 ### **Route: Get User Profile**
 - **External View**:
@@ -131,4 +131,4 @@ All Gateway exceptions return a standardized JSON problem payload:
   - Headers: `Authorization: Bearer <token>`
 - **Internal Proxied View (to User Service)**:
   - `gRPC UserService/GetUser`
-  - Appended Headers: `X-User-Id: <uuid>`, `X-Trace-Id: <trace-id>`
+  - Appended Headers: `X-User-Id: <uuid>`, `traceparent: <trace-id>`

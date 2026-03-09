@@ -51,7 +51,7 @@ flowchart TD
 
 ### Queue Consumption Strategy
 1. **Poll**: The consumer reads a batch of messages from `domain.orders.events` (e.g., `batch.size=100`).
-2. **Idempotency Check**: For each message, extract the `eventId`. Attempt a Redis `SETNX handled:{eventId} true EX 604800` (7-day TTL).
+2. **Idempotency Check**: For each message, extract the `event_id`. Attempt a Redis `SETNX event:handled:{event_id} true EX 604800` (7-day TTL).
    - If false (already exists), explicitly acknowledge the offset to Kafka and skip processing.
 3. **Route**: Inspect `eventType` (e.g., `OrderCreated`). Look up user preferences from a local High-Speed Cache materialized from a Kafka compacted topic (e.g., `users_preferences_compacted`). This eliminates synchronous gRPC network hops to the User Service.
 4. **Render**: Fetch the template `order_created_email_en.html` and inject the `data.totalAmountCents` payload.
@@ -64,10 +64,10 @@ flowchart TD
 The service expects strict CloudEvents schema compliance.
 ```json
 {
-  "eventId": "evt_abc123",
+  "event_id": "evt_abc123",
   "eventType": "OrderCreated",
   "data": {
-    "userId": "usr_9cc9b6",
+    "user_id": "usr_9cc9b6",
     "totalAmountCents": 5000,
     "currency": "USD"
   }
@@ -118,7 +118,7 @@ Messages that exhaust retries or trigger unhandled schema parsing exceptions are
 
 ### Security Considerations
 - **PII Leakage**: Notifications inherently contain Personal Identifiable Information (Emails, Phone Numbers). The service must use TLS for all outgoing provider traffic. 
-- Loggers must be explicitly configured to **mask** or Drop PII inside the JSON payload before writing to `stdout` to avoid polluting Elasticsearch/Datadog.
+- Loggers must be explicitly configured to **mask** or Drop PII inside the JSON payload before writing to `stdout` to avoid polluting Elasticsearch/OpenSearch.
 
 ### Observability
 - **Metrics**: 

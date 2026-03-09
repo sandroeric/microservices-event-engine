@@ -103,5 +103,5 @@ The pipeline is managed via **GitHub Actions** (or Gitlab CI). It enforces stric
 Observability is treated as a first-class citizen using the OpenTelemetry specification.
 
 - **Metrics Collection**: Microservices expose a `/metrics` Prometheus endpoint. A cluster-internal Prometheus server scrapes these, and Grafana visualizes dashboards (Go/Node heaps, HTTP errors, Kafka lag).
-- **Log Aggregation**: Containers write JSON logs to standard output. **Fluent Bit** DaemonSets collect logs and ship them to ElasticSearch or Datadog.
+- **Log Aggregation**: Containers write JSON logs to standard output. **Fluent Bit** DaemonSets collect logs and ship them to ElasticSearch or OpenSearch.
 - **Distributed Tracing**: The API Gateway initiates an OpenTelemetry trace ID. This ID is passed via HTTP Headers (`traceparent`) and Kafka record headers. Traces export to Jaeger/Tempo to visualize multi-service latencies. *(Note: Consider a Service Mesh like Istio/Linkerd for seamless mTLS and network-level observability).*

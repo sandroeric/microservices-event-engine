@@ -8,9 +8,8 @@ Unit tests validate the smallest testable parts of an application (functions, me
 
 - **Scope**: Core domain logic, state machine transitions, template rendering, and utility functions.
 - **Dependencies**: All external dependencies (PostgreSQL, Redis, Kafka, HTTP clients) MUST be mocked.
-- **Tools**: 
-  - Go: Native `go test`.
-  - Python: `pytest` with `unittest.mock`.
+- **Tooling**: 
+  - Go: `testing` package with `testify` (assert and mock).
 - **Coverage Target**: 80% minimum line coverage for business logic packages.
 - **Mutation Testing**: To ensure test quality and prevent "gaming" the coverage metric, we occasionally run mutation testing tools (e.g., `go-mutesting`) to verify our tests catch injected bugs.
 - **Execution**: Runs on every commit to any branch. Must execute in under 30 seconds.
@@ -19,7 +18,7 @@ Unit tests validate the smallest testable parts of an application (functions, me
 Integration tests verify that our microservice interacts correctly with its real external dependencies (databases, caches, message brokers). We do NOT use in-memory SQLite or embedded Redis; we test against the exact container images used in production.
 
 - **Scope**: Repository layers (SQL queries), Cache adapters, Kafka Producers/Consumers, and REST API handlers.
-- **Tooling**: **[Testcontainers](https://testcontainers.com/)** (available in Go, Python).
+- **Tooling**: **[Testcontainers](https://testcontainers.com/)** (available in Go).
 - **Workflow**:
   1. The test suite programmatically spins up Docker containers for PostgreSQL, Redis, and Kafka.
   2. The database receives a fresh schema migration.
@@ -42,7 +41,7 @@ In a microservices architecture, services must communicate reliably. Contract te
 E2E testing validates system-wide user journeys across multiple services simultaneously in a production-like environment.
 
 - **Scope**: Critical business flows (e.g., "User registers, places an order, and receives an email notification").
-- **Tooling**: **Playwright**, **Cypress**, or native Go/Python HTTP test suites.
+- **Tooling**: **Playwright**, **Cypress**, or native Go HTTP test suites.
 - **Strategy**: Define realistic test data scenarios. Run black-box tests against exposed API boundaries. Use synthetic data generators (e.g., GoFakeIt, Faker) or sanitized production snapshots. Clean up data post-run via specific teardown hooks. 
 - **Execution**: Runs against the `staging` environment post-deployment or during nightly builds.
 
@@ -74,7 +73,7 @@ Integrating security directly into our testing lifecycle is essential to prevent
 
 - **Scope**: Application source code, third-party libraries, and container images.
 - **Tooling**:
-  - **SAST (Static Application Security Testing)**: `gosec` for Go, `bandit` for Python.
+  - **SAST (Static Application Security Testing)**: `gosec` for Go.
   - **Dependency Scanning**: `govulncheck`, Snyk, or Dependabot to scan for known CVEs.
   - **DAST (Dynamic Application Security Testing)**: Automated dynamic scanning to catch runtime vulnerabilities in the deployed application.
 - **Execution**: SAST and Dependency scanning run on every PR. DAST runs post-deployment to `staging`.
