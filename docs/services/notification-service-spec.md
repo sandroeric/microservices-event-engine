@@ -51,7 +51,7 @@ flowchart TD
 
 ### Queue Consumption Strategy
 1. **Poll**: The consumer reads a batch of messages from `domain.orders.events` (e.g., `batch.size=100`).
-2. **Idempotency Check**: For each message, extract the `id`. Attempt a Redis `SETNX handled:event:{id} true EX 604800` (7-day TTL).
+2. **Idempotency Check**: For each message, extract the `id`. Attempt a Redis `SETNX handled:event:{id} 1 EX 604800` (7-day TTL).
    - If false (already exists), explicitly acknowledge the offset to Kafka and skip processing.
 3. **Route**: Inspect `type` (e.g., `domain.orders.OrderCreated`). Look up user preferences from a local High-Speed Cache materialized from a Kafka compacted topic (e.g., `users_preferences_compacted`). This eliminates synchronous gRPC network hops to the User Service.
 4. **Render**: Fetch the template `order_created_email_en.html` and inject the `data.totalAmountCents` payload.
@@ -80,7 +80,7 @@ The service expects strict CloudEvents v1.0 schema compliance, matching the form
 ```
 
 ### Notification Templates
-Templates use a templating engine (e.g., Go `text/template`, Handlebars, or Jinja2).
+Templates use a templating engine (e.g., Go `text/template` or Handlebars).
 - **Template Management**: Templates are stored centrally in an S3 Bucket and cached in-memory by the Notification Service. The service exposes an admin endpoint to flush the cache or polls S3 periodically.
 
 **`order_created_email_en.html`**

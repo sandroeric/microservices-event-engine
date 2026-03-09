@@ -61,7 +61,7 @@ erDiagram
         uuid order_id FK
         varchar product_id
         int quantity
-        bigint unit_price
+        bigint unit_price_cents
     }
     ORDERS ||--|{ ORDER_ITEMS : contains
 
@@ -88,9 +88,10 @@ erDiagram
         jsonb metadata
     }
     DAILY_SALES_METRICS {
-        date metric_date PK
+        date date PK
         bigint total_orders
         bigint gross_revenue
+        bigint unique_users
     }
 ```
 *Note: The relationship lines spanning across microservices (e.g., `ORDERS.user_id` referencing `USERS.id`) are **logical constraints** maintained by the application and event architecture, NOT foreign key constraints enforced by the database engine.*

@@ -57,7 +57,7 @@ The transactional data store ensuring ACID properties for all financial records.
 | `order_id` | UUID | FOREIGN KEY | `REFERENCES orders(id)`. |
 | `product_id` | VARCHAR(255) | NOT NULL | SKU or product ID. |
 | `quantity` | INTEGER | CHECK (quantity > 0) | Quantity ordered. |
-| `unit_price` | BIGINT | NOT NULL | Price per unit in cents. |
+| `unit_price_cents` | BIGINT | NOT NULL | Price per unit in cents. |
 
 **Table: `outbox_events`**
 | Column | Type | Constraints | Description |
@@ -142,8 +142,8 @@ All events published to the `domain.orders.events` topic must conform to the fol
 ## 7. Caching Strategy
 To serve the high volume of "Where is my order?" requests, the service utilizes Redis.
 
-- **Key**: `order:detail:{order_id}`
-- **TTL**: 10 minutes.
+- **Key**: `order:detail:v1:{order_id}`
+- **TTL**: 10 minutes + jitter.
 - **Asynchronous Cache Invalidation (CDC)**: Instead of a synchronous `DEL` command that can lead to data races between parallel requests, the service employs **Change Data Capture (Debezium)** to listen to PostgreSQL WAL changes and automatically invalidate/update Redis. This ensures the cache perfectly mirrors the database state.
 - **Read-Through**: Upon `GET /v1/orders/{id}`, check Redis. On miss, read from Postgres, serialize to JSON, write to Redis, and return.
 

@@ -81,7 +81,7 @@ sequenceDiagram
 **`users` table**
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Surrogate key |
+| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v7() | Surrogate key |
 | `email` | VARCHAR(255) | UNIQUE, NOT NULL, indexed | Login identifier |
 | `password_hash` | VARCHAR(255) | NOT NULL | Argon2id hash |
 | `first_name` | VARCHAR(100) | NOT NULL | User's given name |
@@ -103,9 +103,9 @@ sequenceDiagram
 **`orders` table**
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Surrogate key |
+| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v7() | Surrogate key |
 | `user_id` | UUID | NOT NULL, indexed | Logical FK to `users.id` (no physical FK across services) |
-| `idempotency_key` | UUID | UNIQUE, NOT NULL | Prevents duplicate order creation |
+| `idempotency_key` | VARCHAR(255) | UNIQUE, NOT NULL | Prevents duplicate order creation |
 | `total_amount` | BIGINT | NOT NULL | Amount in smallest currency unit (e.g., cents) |
 | `currency` | VARCHAR(3) | NOT NULL, DEFAULT 'USD' | ISO 4217 currency code |
 | `status` | VARCHAR(50) | NOT NULL, DEFAULT 'PENDING' | `PENDING`, `PAYMENT_PROCESSING`, `PAYMENT_COMPLETED`, `PAYMENT_FAILED`, `FULFILLMENT_IN_PROGRESS`, `SHIPPED`, `DELIVERED`, `CANCELLED` |
@@ -124,7 +124,7 @@ sequenceDiagram
 **`outbox_events` table** *(shared by all services that publish events)*
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Event ID; used as Kafka message `id` |
+| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v7() | Event ID; used as Kafka message `id` |
 | `aggregate_type` | VARCHAR(100) | NOT NULL | e.g., `order`, `user` |
 | `aggregate_id` | UUID | NOT NULL, indexed | The ID of the entity that changed |
 | `event_type` | VARCHAR(200) | NOT NULL | e.g., `domain.orders.OrderCreated` |
