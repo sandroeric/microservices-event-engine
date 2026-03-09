@@ -77,17 +77,17 @@ Used for the Transactional Outbox pattern to guarantee event publishing.
 | `id` | UUID | PRIMARY KEY | Event ID. |
 | `aggregate_type` | VARCHAR(100) | NOT NULL | e.g., `user`. |
 | `aggregate_id` | UUID | NOT NULL | The `user_id` mutated. |
-| `event_type` | VARCHAR(100) | NOT NULL | e.g., `UserCreated`. |
+| `event_type` | VARCHAR(100) | NOT NULL | e.g., `domain.users.UserCreated`. |
 | `payload` | JSONB | NOT NULL | The event body. |
 | `status` | VARCHAR(50) | DEFAULT 'PENDING'| `PENDING` or `PUBLISHED`. |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | When the event was written. |
 
 ## 5. Caching Strategy
 - **Mechanism**: Read-through cache backed by Redis.
-- **Keys**: `user:profile:{user_id}`
+- **Keys**: `user:profile:v1:{user_id}`
 - **TTL**: 1 hour.
 - **Invalidation**: 
-  - To prevent read-write data races upon rapid subsequent edits, the service utilizes **Change Data Capture (Debezium)**. Upon updating the PostgreSQL row, Debezium streams the WAL changes and asynchronously updates or invalidates the Redis key (`user:profile:{user_id}`).
+  - To prevent read-write data races upon rapid subsequent edits, the service utilizes **Change Data Capture (Debezium)**. Upon updating the PostgreSQL row, Debezium streams the WAL changes and asynchronously updates or invalidates the Redis key (`user:profile:v1:{user_id}`).
 - **Performance consideration**: Profiles are heavily read by internal systems (if not passed via headers), making this cache critical for latency.
 
 ## 6. APIs and Interfaces
@@ -155,13 +155,13 @@ To ensure the `UserCreated` event is published to Kafka *if and only if* the Pos
 2. Insert new user into `users` table.
 3. Insert event payload into `outbox_events` table (Status: `PENDING`).
 4. Commit Transaction.
-5. An asynchronous background process (or Debezium) sweeps `outbox_events` where `status = PENDING`, publishes them to Kafka topic `domain.users.events`, and updates the status to `PUBLISHED`.
+5. An asynchronous **Debezium CDC relay** (or a polling worker as fallback) sweeps `outbox_events` where `status = PENDING`, publishes them to Kafka topic `domain.users.events`, and updates the status to `PUBLISHED`.
 
 ## 8. Security Considerations
 
 - **Password Hashing**: Use **Argon2id** (the memory-hard winner of the Password Hashing Competition) to mitigate GPU-based cracking attacks. Never log passwords in plain text.
 - **JWT Generation**: Access tokens are signed using `RS256` (Asymmetric). The private key is securely stored in a Secret Manager (e.g., AWS Secrets Manager, HashiCorp Vault) and loaded into memory on service startup. Only the public key is exposed (via a JWKS endpoint) for the API Gateway to verify signatures.
-- **Token Blacklisting (Revocation)**: When a user logs out, the refresh token is marked `is_revoked = true` in Postgres. To immediately invalidate the short-lived access token, its `jti` (JWT ID) is placed in a Redis blacklist (`blacklist:{jti}`) with a TTL equal to the token's remaining lifespan. The API Gateway checks this blacklist during auth.
+- **Token Blacklisting (Revocation)**: When a user logs out, the refresh token is marked `is_revoked = true` in Postgres. To immediately invalidate the short-lived access token, its `jti` (JWT ID) is placed in a Redis blacklist (`blacklist:jwt:{jti}`) with a TTL equal to the token's remaining lifespan. The API Gateway checks this blacklist during auth.
 - **PII Protection**: Fields like `email`, `first_name`, and `last_name` should be encrypted at rest within the PostgreSQL database using Transparent Data Encryption (TDE) or application-level encryption for high-compliance environments.
 
 ## 9. Edge Cases

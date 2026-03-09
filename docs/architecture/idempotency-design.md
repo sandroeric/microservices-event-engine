@@ -47,7 +47,7 @@ The platform employs a two-tiered approach to idempotency storage to balance ext
 - **Mechanism**:
   1. Gateway attempts to `SETNX idemp:api:{Idempotency-Key} "PROCESSING" EX 30`.
   2. If it succeeds, the request routes to the downstream service.
-  3. When the downstream service returns the response body (e.g., `{"order_id": "123"}`), the Gateway updates the Redis key with the serialized HTTP response: `SET idempotency:api:{Idempotency-Key} "{...response...}"`.
+  3. When the downstream service returns the response body (e.g., `{"order_id": "123"}`), the Gateway updates the Redis key with the serialized HTTP response: `SET idemp:api:{Idempotency-Key} "{...response...}"`.
   4. If a duplicate request arrives and the key equals `"PROCESSING"`, the Gateway returns `409 Conflict` (indicating a concurrent request is already handling this intent).
   5. If a duplicate request arrives and the key holds a JSON payload, the Gateway instantly returns `200 OK` with the cached payload, saving the downstream service from execution.
 
@@ -81,10 +81,10 @@ Kafka provides At-Least-Once delivery semantics by default. A consumer (e.g., No
 - **Idempotent Identifiers**: All Kafka events adhere to CloudEvents and include a globally unique `id` (e.g., `evt_abc123`).
 - **Consumer Processing Logic**:
   1. Consumer reads message `evt_abc123` from Kafka.
-  2. Consumer executes a Redis Atomic Check: `SETNX idempotency:event:{evt_abc123} 1 EX 604800` (7-day TTL).
+  2. Consumer executes a Redis Atomic Check: `SETNX handled:event:{evt_abc123} 1 EX 604800` (7-day TTL).
   3. **If 0 (False)**: The event was already processed. The consumer acknowledges/commits the Kafka offset immediately and skips processing.
   4. **If 1 (True)**: First time seeing this event. Process the notification payload.
-- **OLAP Exceptions**: For databases built for UPSERT operations (like the Analytics Service PostgreSQL data warehouse), explicit Redis checks are bypassed. The service relies on `ON CONFLICT (event_id) DO UPDATE` to achieve idempotency at the storage layer, maximizing throughput.
+- **OLAP Exceptions**: The Analytics Service employs a two-tier strategy. For raw event ingestion into `raw_events` (which has no UNIQUE constraints to maximize write throughput), Redis-based deduplication (`handled:event:{evt_id}`, 7-day TTL) prevents duplicate inserts. For rollup/aggregation tables like `daily_sales_metrics`, the service relies on `ON CONFLICT (date) DO UPDATE` to achieve idempotency at the storage layer, ensuring late-arriving or replayed events simply recalculate the correct aggregate.
 
 ## 5. Retry-Safe Operations
 

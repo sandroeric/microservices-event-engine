@@ -24,7 +24,7 @@ Requests traverse a configured middleware chain before being proxied downstream:
 3. **CORS Middleware**: Handles preflight requests.
 4. **Rate Limiter Middleware**: Checks Redis counter for the client IP / API Key.
 5. **Auth Middleware**: Validates JWT signature/expiry locally, and checks the Redis Revoked Token Cache to ensure the token hasn't been blacklisted.
-6. **Validation Middleware**: Checks for required headers (`X-Request-ID`, `Idempotency-Key`).
+6. **Validation Middleware**: Checks for required headers (`Idempotency-Key` for mutating requests).
 7. **Cache Middleware**: Returns cached response for GET routes if available.
 8. **Reverse Proxy (Director)**: Routes the request via a Service Mesh (e.g., Istio or Linkerd) or client-side load balancer, providing intelligent retry policies and wrapping requests in a Circuit Breaker.
 
@@ -52,7 +52,7 @@ sequenceDiagram
     
     %% Routing
     MW->>CB: 4. Route Request
-    CB->>OS: POST /orders
+    CB->>OS: gRPC: CreateOrder
     
     alt Downstream OK
         OS-->>CB: 201 Created

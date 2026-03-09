@@ -51,9 +51,9 @@ flowchart TD
 
 ### Queue Consumption Strategy
 1. **Poll**: The consumer reads a batch of messages from `domain.orders.events` (e.g., `batch.size=100`).
-2. **Idempotency Check**: For each message, extract the `event_id`. Attempt a Redis `SETNX event:handled:{event_id} true EX 604800` (7-day TTL).
+2. **Idempotency Check**: For each message, extract the `id`. Attempt a Redis `SETNX handled:event:{id} true EX 604800` (7-day TTL).
    - If false (already exists), explicitly acknowledge the offset to Kafka and skip processing.
-3. **Route**: Inspect `eventType` (e.g., `OrderCreated`). Look up user preferences from a local High-Speed Cache materialized from a Kafka compacted topic (e.g., `users_preferences_compacted`). This eliminates synchronous gRPC network hops to the User Service.
+3. **Route**: Inspect `type` (e.g., `domain.orders.OrderCreated`). Look up user preferences from a local High-Speed Cache materialized from a Kafka compacted topic (e.g., `users_preferences_compacted`). This eliminates synchronous gRPC network hops to the User Service.
 4. **Render**: Fetch the template `order_created_email_en.html` and inject the `data.totalAmountCents` payload.
 5. **Dispatch**: Aggregate notifications and send batch HTTP requests to third-party providers (e.g., SendGrid, FCM) that support bulk dispatching. This reduces outbound connection overhead and helps avoid strict rate limits.
 6. **Commit**: Strictly commit the Kafka offset *only* after a successful 2xx response from the provider or routing to the DLQ.
@@ -61,11 +61,16 @@ flowchart TD
 ## 5. Data Models & Templates
 
 ### Event Formats (Consumption)
-The service expects strict CloudEvents schema compliance.
+The service expects strict CloudEvents v1.0 schema compliance, matching the format published by all upstream producers.
 ```json
 {
-  "event_id": "evt_abc123",
-  "eventType": "OrderCreated",
+  "specversion": "1.0",
+  "id": "evt_abc123",
+  "source": "/services/order-service",
+  "type": "domain.orders.OrderCreated",
+  "datacontenttype": "application/json",
+  "time": "2026-03-07T12:00:00Z",
+  "subject": "ord_987654",
   "data": {
     "user_id": "usr_9cc9b6",
     "totalAmountCents": 5000,

@@ -146,7 +146,7 @@ The **Prometheus AlertManager** evaluates metrics against predefined thresholds 
 Alert definitions must include `for:` clauses to prevent noisy flapping on brief spikes.
 ```yaml
 - alert: HighConsumerLag
-  expr: kafka_consumergroup_lag > 5000
+  expr: kafka_consumergroup_lag > 10000
   for: 5m
   labels:
     severity: page

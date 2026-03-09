@@ -12,7 +12,7 @@ Topics are strictly bounded by Domain Entities (Aggregates). We avoid grouping u
 
 - `domain.users.events`: All mutations related to the User Aggregate (e.g., `UserCreated`, `UserUpdated`).
 - `domain.orders.events`: All mutations related to the Order Aggregate (e.g., `OrderCreated`, `PaymentFailed`).
-- `sys.notifications.dlq`: Dead Letter Queue for failed notification processing.
+- `domain.notifications.dlq`: Dead Letter Queue for failed notification processing.
 
 ### Partitioning & Ordering
 - **Partition Key**: All events related to a specific aggregate MUST use the Aggregate's ID (e.g., `user_id` or `order_id`) as the Kafka message key.
@@ -118,7 +118,7 @@ flowchart TD
 
 ### Producer Design (Transactional Outbox)
 - Microservices MUST NOT explicitly call `kafka_producer.send()` during an HTTP request.
-- **Implementation**: The service inserts the event into a local PostgreSQL `outbox_events` table within the same transaction that updates the business entity. A background CDC (Change Data Capture) tool like **Debezium** or a custom polling worker reads the outbox table and guarantees *At-Least-Once* delivery to Kafka.
+- **Implementation**: The service inserts the event into a local PostgreSQL `outbox_events` table within the same transaction that updates the business entity. A background CDC (Change Data Capture) tool — primarily **Debezium** (or a custom polling worker as fallback) — reads the outbox table and guarantees *At-Least-Once* delivery to Kafka.
 - **Prerequisite**: PostgreSQL must have **logical replication** enabled (`wal_level = logical`) for Debezium to tail the WAL. This must be provisioned at cluster creation time.
 
 ### Consumer Groups
@@ -131,7 +131,7 @@ flowchart TD
 ### Idempotent Event Consumption
 Kafka's *At-Least-Once* delivery guarantee means consumers will occasionally receive the same event twice (e.g., during consumer rebalancing).
 - **Rule**: Every consumer MUST be idempotent.
-- **Strategy A (Strict)**: The consumer checks the event `id` against a Redis cache (`SETNX event:processed:{id} 1 EX 86400`). If the key exists, acknowledge the offset and skip processing.
+- **Strategy A (Strict)**: The consumer checks the event `id` against a Redis cache (`SETNX handled:event:{id} 1 EX 604800`). If the key exists, acknowledge the offset and skip processing.
 - **Strategy B (Database UPSERT)**: The Analytics Service simply uses SQL `ON CONFLICT (id) DO UPDATE`. Replaying the event yields the same final state.
 
 ### Consumer Rebalancing & Long Retries
@@ -143,7 +143,7 @@ Since Kafka is a sequential log, a consumer cannot easily "skip" a failing messa
 | Config | Recommended Value | Notes |
 |---|---|---|
 | `max.poll.interval.ms` | `600000` (10 min) | Adjust per service SLA |
-| `max.poll.records` | `50` | Limit batch size to reduce rebalance impact |
+| `max.poll.records` | `50` | Default batch size; high-throughput services (e.g., Analytics: `5000`) may override |
 | `session.timeout.ms` | `45000` | Must be < `max.poll.interval.ms` |
 
 ### Dead Letter Queues (DLQ)

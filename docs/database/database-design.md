@@ -35,6 +35,15 @@ erDiagram
         boolean is_revoked
     }
     USERS ||--o{ REFRESH_TOKENS : has
+    AUDIT_LOGS {
+        uuid id PK
+        uuid user_id FK
+        varchar action
+        inet ip_address
+        text user_agent
+        timestamp created_at
+    }
+    USERS ||--o{ AUDIT_LOGS : generates
 
     %% Order Service Local Schema
     ORDERS {

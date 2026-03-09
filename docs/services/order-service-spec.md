@@ -65,7 +65,7 @@ The transactional data store ensuring ACID properties for all financial records.
 | `id` | UUID | PRIMARY KEY | Event ID. |
 | `aggregate_type` | VARCHAR(100) | NOT NULL | e.g., `order`. |
 | `aggregate_id` | UUID | NOT NULL | The order aggregate ID. |
-| `event_type` | VARCHAR(100) | NOT NULL | e.g., `OrderCreated`. |
+| `event_type` | VARCHAR(100) | NOT NULL | e.g., `domain.orders.OrderCreated`. |
 | `payload` | JSONB | NOT NULL | Full event structure. |
 | `status` | VARCHAR(20) | DEFAULT 'PENDING' | `PENDING`, `PUBLISHED`. |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Timestamp. |

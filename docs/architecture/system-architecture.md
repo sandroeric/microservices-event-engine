@@ -91,6 +91,14 @@ sequenceDiagram
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Last mutation (trigger-maintained) |
 
+**`refresh_tokens` table**
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `token_id` | UUID | PRIMARY KEY | JTI (JWT ID) of the refresh token |
+| `user_id` | UUID | NOT NULL, FK → `users.id` ON DELETE CASCADE | Owning user |
+| `expires_at` | TIMESTAMPTZ | NOT NULL | Absolute expiration time |
+| `is_revoked` | BOOLEAN | NOT NULL, DEFAULT FALSE | Manual invalidation flag |
+
 ### Order Service (PostgreSQL)
 **`orders` table**
 | Column | Type | Constraints | Description |
@@ -98,8 +106,9 @@ sequenceDiagram
 | `id` | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Surrogate key |
 | `user_id` | UUID | NOT NULL, indexed | Logical FK to `users.id` (no physical FK across services) |
 | `idempotency_key` | UUID | UNIQUE, NOT NULL | Prevents duplicate order creation |
-| `total_amount_cents` | BIGINT | NOT NULL | Amount in smallest currency unit (avoids float precision issues) |
-| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'PENDING' | `PENDING`, `COMPLETED`, `FAILED`, `REFUNDED` |
+| `total_amount` | BIGINT | NOT NULL | Amount in smallest currency unit (e.g., cents) |
+| `currency` | VARCHAR(3) | NOT NULL, DEFAULT 'USD' | ISO 4217 currency code |
+| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'PENDING' | `PENDING`, `PAYMENT_PROCESSING`, `PAYMENT_COMPLETED`, `PAYMENT_FAILED`, `FULFILLMENT_IN_PROGRESS`, `SHIPPED`, `DELIVERED`, `CANCELLED` |
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Last mutation (trigger-maintained) |
 
@@ -164,7 +173,7 @@ The following sequence details how data flows through the system when a user cre
 2. **API Gateway** validates the JWT (via local public key verification) and checks the `Idempotency-Key` in **redis-critical**.
 3. **API Gateway** routes the request to the **Order Service** via gRPC.
 4. **Order Service** persists the new order as `PENDING` in **PostgreSQL**, writing both the `orders` row and an `outbox_events` row in the same transaction.
-5. A background **Outbox Relay** (Debezium or polling worker) reads the `outbox_events` table and publishes the `OrderCreated` event to **Kafka**.
+5. A background **Outbox Relay** — primarily **Debezium CDC** (or a polling worker as fallback) — reads the `outbox_events` table and publishes the `OrderCreated` event to **Kafka**.
 6. **API Gateway** returns `201 Created` to the client as soon as the Order Service confirms the DB write (the Kafka publish is asynchronous).
 7. **Notification Service** consumes `OrderCreated` and sends an order confirmation email.
 8. **Analytics Service** consumes `OrderCreated` and updates the real-time sales dashboard metrics.
