@@ -96,10 +96,15 @@ To ensure adherence to this testing strategy, developer ergonomics and pipeline 
   - `make test-integration` (Spins up Testcontainers and runs integrations)
   - `make test-coverage` (Generates HTML coverage reports)
 - **CI/CD Pipeline Sequence**:
-  1. **Lint & Security (SAST/Dep Scan) & Unit Tests** (Parallelize) - Fails fast.
-  2. **Integration Tests** - Requires Docker footprint.
-  3. **Contract Tests** - validates provider/consumer guarantees.
-  4. **Build Image & Push**
-  5. **Deploy to Staging**
-  6. **E2E, Observability & DAST Testing** (Post-deployment)
-  7. **Load/Chaos** (Nightly/Scheduled)
+  - **CI (Pull Request)**:
+    1. **Linting & Formatting**
+    2. **Static Application Security Testing (SAST)**
+    3. **Unit & Integration Testing (Testcontainers)**
+    4. **Contract Testing** (Ensure Provider/Consumer compatibility)
+    5. **Build Image & Scan (Trivy + SBOM)**
+  - **CD (Merge to Main)**:
+    1. **Push Image to Registry**
+    2. **Update GitOps Helm Values**
+    3. **ArgoCD Deploy to Staging**
+    4. **E2E, Observability & DAST Testing** (Post-deployment)
+    5. **Load/Chaos** (Scheduled or Nightly)

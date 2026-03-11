@@ -148,8 +148,9 @@ sequenceDiagram
 | Column | Type | Description |
 |--------|------|-------------|
 | `date` | DATE | Primary Key |
-| `total_orders` | INT | Aggregate count |
-| `total_revenue_cents` | BIGINT | Aggregate sum in cents |
+| `total_orders` | BIGINT | Aggregate count |
+| `gross_revenue_cents` | BIGINT | Aggregate sum in cents |
+| `unique_users` | BIGINT | Aggregate count of unique users |
 
 ## 5. APIs or Interfaces
 
@@ -164,7 +165,8 @@ The API Gateway exposes RESTful endpoints to external clients and proxies them t
 {
   "items": [
     {"product_id": "prod_1", "quantity": 2}
-  ]
+  ],
+  "payment_method_id": "pm_card_visa"
 }
 ```
 - **Response**: `201 Created`

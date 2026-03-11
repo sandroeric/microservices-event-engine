@@ -45,7 +45,7 @@ maxmemory-policy volatile-lru
 The primary pattern for read-heavy entities (User Profiles, Order Details). The application code is responsible for managing both the cache and the database.
 
 **Workflow:**
-1. Check Redis for `user:profile:{id}`.
+1. Check Redis for `user:profile:v1:{user_id}`.
 2. **If Cache Hit**: Return data immediately.
 3. **If Cache Miss**: 
    - Read from PostgreSQL.
@@ -138,11 +138,11 @@ To prevent key collisions across microservices sharing the same Redis cluster, a
 
 | Service | Namespace / Pattern | Default TTL | Instance | Eviction Policy |
 |---------|---------------------|-------------|----------|-----------------|
-| User | `user:profile:v1:{id}` | 1 Hr + Jitter | `redis-cache` | `volatile-lru` |
-| Order | `order:detail:v1:{id}` | 10 Mins + Jitter| `redis-cache` | `volatile-lru` |
+| User | `user:profile:v1:{user_id}` | 1 Hr + Jitter | `redis-cache` | `volatile-lru` |
+| Order | `order:detail:v1:{order_id}` | 10 Mins + Jitter| `redis-cache` | `volatile-lru` |
 | API Gateway | `ratelimit:{tier}:{ip}` | Window size | `redis-critical` | `noeviction` |
-| API Gateway | `idemp:api:{hash}` | 24 Hrs | `redis-critical` | `noeviction` |
+| API Gateway | `idemp:api:{key}` | 24 Hrs | `redis-critical` | `noeviction` |
 | User | `blacklist:jwt:{jti}` | JWT Expiry | `redis-critical` | `noeviction` |
-| Events | `handled:event:{evt_id}` | 7 Days | `redis-critical` | `noeviction` |
+| Events | `handled:event:{id}` | 7 Days | `redis-critical` | `noeviction` |
 
 > **Key for Redis Cluster users**: Keys in the same hash slot can be grouped using hash tags. For example, `{user:123}:profile` and `{user:123}:settings` will be co-located, enabling multi-key operations. Use this only when you need atomic operations across multiple keys for the same entity.
